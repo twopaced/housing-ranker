@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>State Housing Market Ranker</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#14181f;--mute:#5b6472;--line:#d9dde4;--accent:#1f5eff;--bar:#cfd9f6;--warn:#8a5a00;--warnbg:#fff6e0}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,Segoe UI,Roboto,Arial,sans-serif}
+header{padding:22px 28px 6px}h1{margin:0;font-size:24px}.sub{color:var(--mute);font-size:13px;margin-top:4px}
+main{display:grid;grid-template-columns:340px 1fr;gap:20px;padding:16px 28px 28px;align-items:start}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 20px}
+h2{font-size:16px;margin:0 0 12px}h3{font-size:14px;margin:18px 0 8px}
+label{display:block;font-weight:600;font-size:13px;margin:12px 0 4px}
+input,select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font:inherit;background:#fff}
+input[type=range]{padding:0}.hint{color:var(--mute);font-size:12px;margin-top:3px}
+.ends{display:flex;justify-content:space-between;font-size:12px;color:var(--mute)}
+button{margin-top:18px;width:100%;padding:11px;border:0;border-radius:8px;background:var(--accent);color:#fff;font:600 15px inherit;cursor:pointer}
+button:disabled{background:#9aa7c7;cursor:not-allowed}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}@media(max-width:700px){.kpis{grid-template-columns:repeat(2,1fr)}}
+.kpi{border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.kpi b{display:block;font-size:12px;color:var(--mute);font-weight:600}.kpi span{font-size:22px;font-weight:700}.kpi small{display:block;color:var(--mute);font-size:11px;margin-top:2px}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:8px 6px;text-align:right;border-bottom:1px solid var(--line)}
+th:nth-child(-n+2),td:nth-child(-n+2){text-align:left}th{font-size:12px;color:var(--mute);font-weight:600}
+.sc{display:flex;align-items:center;gap:8px;justify-content:flex-end}.bar{height:8px;background:var(--bar);border-radius:4px;width:80px;overflow:hidden}.bar i{display:block;height:100%;background:var(--accent)}
+.why{background:#f1f5ff;border-left:3px solid var(--accent);padding:10px 12px;border-radius:4px;font-size:14px}
+.tr{border:2px solid var(--ink);border-radius:8px;padding:10px 14px;background:#fafafa}.tr ul{margin:0;padding-left:18px}.tr li{margin:4px 0;font-size:13.5px}
+.warn{background:var(--warnbg);color:var(--warn);border:1px solid #f0d9a0;border-radius:6px;padding:8px 10px;font-size:13px;margin-bottom:10px}
+.err{background:#fdecec;color:#9b1c1c;border:1px solid #f3b9b9;border-radius:6px;padding:8px 10px;font-size:13px;margin-bottom:10px}
+.prog{height:8px;background:var(--bar);border-radius:4px;overflow:hidden;margin-top:8px}.prog i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
+.foot{color:var(--mute);font-size:12px;margin-top:14px}.empty{color:var(--mute);padding:20px 0}
+</style></head><body>
+<header><h1>State Housing Market Ranker</h1>
+<div class="sub">Which U.S. states best fit my budget, risk tolerance &amp; time horizon? &middot; Live data from the FRED API</div></header>
+<main>
+<section class="card">
+  <h2>Inputs</h2>
+  <label for="budget">Budget cap (max median listing price, $)</label>
+  <input id="budget" type="number" value="450000" min="50000" max="5000000" step="10000">
+  <label for="horizon">Time horizon</label>
+  <select id="horizon"><option value="3">3 years</option><option value="5" selected>5 years</option><option value="10">10 years</option></select>
+  <label for="minIncome">Minimum per-capita income ($)</label>
+  <input id="minIncome" type="number" value="60000" min="0" max="200000" step="1000">
+  <label for="weight">Priority weight: <span id="wlabel">5</span> / 10</label>
+  <input id="weight" type="range" min="0" max="10" step="1" value="5">
+  <div class="ends"><span>0 = Stability</span><span>10 = Growth</span></div>
+  <button id="run" disabled>Run / Get Recommendations</button>
+  <div id="load" class="hint">Connecting to FRED&hellip;</div>
+  <div class="prog"><i id="progbar"></i></div>
+</section>
+<section>
+  <div id="msgs"></div>
+  <div class="card">
+    <h2>Dashboard KPIs <span id="kpiFor" class="hint"></span></h2>
+    <div class="kpis">
+      <div class="kpi"><b>Price CAGR</b><span id="k1">&ndash;</span><small>(HPI_end / HPI_start)^(1/N) &minus; 1</small></div>
+      <div class="kpi"><b>Price volatility</b><span id="k2">&ndash;</span><small>std. dev. of YoY HPI change</small></div>
+      <div class="kpi"><b>Income&ndash;price gap</b><span id="k3">&ndash;</span><small>income CAGR &minus; HPI CAGR</small></div>
+      <div class="kpi"><b>States passing filters</b><span id="k4">&ndash;</span><small id="k4s">budget + income + data checks</small></div>
+    </div>
+    <h3>Recommendation: top 5 states</h3>
+    <div id="results" class="empty">Set your inputs and press Run.</div>
+    <h3>Why this recommendation?</h3>
+    <div id="why" class="why">Run the model to see the explanation.</div>
+    <h3>Model Transparency</h3>
+    <div class="tr"><ul>
+      <li><b>Assumption:</b> Past 3&ndash;10 year price growth and volatility are used as a proxy for future opportunity and risk; states are scored relative to each other, not against an absolute standard.</li>
+      <li><b>Limitation:</b> State-level data lags and gets revised, and it hides metro and neighborhood differences; median listing price is a budget filter, not a purchase price.</li>
+      <li><b>Does NOT mean:</b> A high score is not a prediction of returns, rent yield, or a buy signal. Rents, taxes, insurance, and financing costs are excluded. This is not financial advice.</li>
+    </ul></div>
+    <div class="foot" id="foot">Data: FRED API series STHPI (house price index), PCPI (per-capita income), MEDLISPRI (median listing price), all 50 states + DC.</div>
+  </div>
+</section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const usd=n=>'$'+Number(n).toLocaleString('en-US');
+$('weight').oninput=e=>{$('wlabel').textContent=e.target.value};
+let timer;
+async function poll(){
+  try{
+    const s=await (await fetch('/api/status')).json();
+    if(s.status==='ready'){
+      $('load').textContent='FRED data ready (pulled '+new Date(s.fetchedAt).toLocaleString()+').';
+      $('progbar').style.width='100%';$('run').disabled=false;clearInterval(timer);
+      $('foot').textContent+=' Pulled '+new Date(s.fetchedAt).toLocaleString()+' (cached up to 24h).';
+      run();
+    }else if(s.status==='error'){
+      $('load').textContent='';$('msgs').innerHTML='<div class="err">'+s.error+'</div>';clearInterval(timer);
+    }else{
+      $('load').textContent='Loading live data from FRED: '+s.done+' / '+s.total+' requests…';
+      $('progbar').style.width=(100*s.done/s.total)+'%';
+    }
+  }catch(e){$('load').textContent='Waiting for server…'}
+}
+timer=setInterval(poll,1500);poll();
+async function run(){
+  $('run').disabled=true;$('msgs').innerHTML='';
+  const q=new URLSearchParams({budget:$('budget').value,horizon:$('horizon').value,minIncome:$('minIncome').value,weight:$('weight').value});
+  try{
+    const res=await fetch('/api/rank?'+q);const d=await res.json();
+    if(!res.ok){$('msgs').innerHTML='<div class="err">'+d.error+'</div>';return}
+    render(d);
+  }catch(e){$('msgs').innerHTML='<div class="err">Request failed: '+e.message+'</div>'}
+  finally{$('run').disabled=false}
+}
+function render(d){
+  $('msgs').innerHTML=d.warnings.map(w=>'<div class="warn">'+w+'</div>').join('');
+  $('k4').textContent=d.qualifying+' of '+d.totalStates;
+  const ex=Object.entries(d.excluded).filter(([,n])=>n).map(([k,n])=>n+' '+k).join(', ');
+  $('k4s').textContent=ex?'excluded: '+ex:'no exclusions';
+  const t=d.top[0];
+  $('kpiFor').textContent=t?'(#1 state: '+t.state+')':'';
+  $('k1').textContent=t?t.cagrPct+'% / yr':'–';
+  $('k2').textContent=t?t.volPct+'%':'–';
+  $('k3').textContent=t?(t.gapPts>=0?'+':'')+t.gapPts+' pts':'–';
+  if(!d.top.length){$('results').className='empty';$('results').textContent='No states to rank.';$('why').textContent='No recommendation: no states pass your filters.';return}
+  const max=Math.max(...d.top.map(x=>x.score),1);
+  $('results').className='';
+  $('results').innerHTML='<table><tr><th>#</th><th>State</th><th>Score</th><th>Price CAGR</th><th>Volatility</th><th>Income–price gap</th><th>Median listing</th></tr>'+
+   d.top.map(x=>'<tr><td>'+x.rank+'</td><td><b>'+x.state+'</b></td><td><div class="sc"><div class="bar"><i style="width:'+(100*x.score/max)+'%"></i></div>'+x.score+'</div></td><td>'+x.cagrPct+'%</td><td>'+x.volPct+'%</td><td>'+(x.gapPts>=0?'+':'')+x.gapPts+' pts</td><td>'+usd(x.listingPrice)+'</td></tr>').join('')+'</table>';
+  $('why').textContent=d.why;
+}
+$('run').onclick=run;
+</script></body></html>

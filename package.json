@@ -1,0 +1,8 @@
+{
+  "name": "state-housing-market-ranker",
+  "version": "0.1.0",
+  "description": "Decision-support app: ranks U.S. states for first-time real estate investors using live FRED API data",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" }
+}
