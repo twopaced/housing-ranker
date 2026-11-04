@@ -1,0 +1,7 @@
+[build]
+  command = "node scripts/build-data.js"
+  publish = "public"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"

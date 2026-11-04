@@ -1,0 +1,8 @@
+{
+  "name": "state-housing-market-ranker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ranks U.S. states for first-time real estate investors using FRED API data (Netlify: build-time data pull + live-check function)",
+  "scripts": { "build": "node scripts/build-data.js" },
+  "engines": { "node": ">=18" }
+}
